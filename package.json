@@ -1,0 +1,22 @@
+{
+  "name": "foodflow",
+  "version": "1.0.0",
+  "description": "FoodFlow - Food Donation Platform",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspace=frontend",
+    "start": "npm run start --workspace=frontend",
+    "lint": "npm run lint --workspace=frontend",
+    "backend:dev": "npm run dev --workspace=backend",
+    "backend:build": "npm run build --workspace=backend",
+    "prisma:generate": "prisma generate --schema=frontend/prisma/schema.prisma && npm run prisma:copy",
+    "prisma:copy": "node -e \"const fs = require('fs'); const path = require('path'); const src = 'node_modules/@prisma/client'; const dst = 'frontend/node_modules/@prisma/client'; if (fs.existsSync(src)) { fs.rmSync(dst, { recursive: true, force: true }); fs.cpSync(src, dst, { recursive: true }); console.log('Prisma client copied to frontend'); }\"",
+    "prisma:migrate": "prisma migrate dev --schema=frontend/prisma/schema.prisma",
+    "prisma:seed": "cd frontend && npx ts-node prisma/seed.ts"
+  }
+}

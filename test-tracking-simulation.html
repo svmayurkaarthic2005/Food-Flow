@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delivery Tracking Simulation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .stop-btn {
+            background: #f44336;
+        }
+        .stop-btn:hover {
+            background: #da190b;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+        }
+        .status.success {
+            background: #e8f5e9;
+            border-left-color: #4CAF50;
+        }
+        .status.error {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+        .log {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .log-entry.success {
+            color: #4CAF50;
+        }
+        .log-entry.error {
+            color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚚 Delivery Tracking Simulation</h1>
+        
+        <div class="form-group">
+            <label for="deliveryId">Delivery ID:</label>
+            <input type="text" id="deliveryId" placeholder="Enter delivery ID" required>
+        </div>
+
+        <div class="form-group">
+            <label for="route">Simulation Route:</label>
+            <select id="route">
+                <option value="chennai-local">Chennai Local (Short)</option>
+                <option value="chennai-long">Chennai Long Route</option>
+                <option value="custom">Custom Coordinates</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="speed">Update Interval (seconds):</label>
+            <input type="number" id="speed" value="2" min="1" max="10">
+        </div>
+
+        <div class="form-group">
+            <label for="simulatedSpeed">Simulated Speed (km/h):</label>
+            <input type="number" id="simulatedSpeed" value="30" min="10" max="100">
+        </div>
+
+        <div>
+            <button id="startBtn" onclick="startSimulation()">Start Simulation</button>
+            <button id="stopBtn" class="stop-btn" onclick="stopSimulation()" disabled>Stop Simulation</button>
+        </div>
+
+        <div id="status" class="status" style="display: none;"></div>
+
+        <div class="log">
+            <strong>Activity Log:</strong>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let simulationInterval = null;
+        let currentIndex = 0;
+        let routeCoordinates = [];
+
+        // Predefined routes
+        const routes = {
+            'chennai-local': [
+                { lat: 13.0827, lng: 80.2707, name: 'Start - Marina Beach' },
+                { lat: 13.0850, lng: 80.2750, name: 'Moving North' },
+                { lat: 13.0880, lng: 80.2780, name: 'Near Lighthouse' },
+                { lat: 13.0900, lng: 80.2800, name: 'Approaching Destination' },
+                { lat: 13.0920, lng: 80.2820, name: 'End - Triplicane' }
+            ],
+            'chennai-long': [
+                { lat: 13.0827, lng: 80.2707, name: 'Start - Marina Beach' },
+                { lat: 13.0500, lng: 80.2500, name: 'Guindy' },
+                { lat: 13.0200, lng: 80.2200, name: 'Velachery' },
+                { lat: 13.0100, lng: 80.2100, name: 'Tambaram' },
+                { lat: 13.0050, lng: 80.2050, name: 'Chromepet' },
+                { lat: 13.0000, lng: 80.2000, name: 'End - Pallavaram' }
+            ]
+        };
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+
+        async function sendLocationUpdate(lat, lng, speed) {
+            const deliveryId = document.getElementById('deliveryId').value;
+            
+            try {
+                const response = await fetch('/api/driver/location', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        delivery_id: deliveryId,
+                        lat: lat,
+                        lng: lng,
+                        speed: speed
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`✓ Location updated: ${lat.toFixed(6)}, ${lng.toFixed(6)} @ ${speed} km/h`, 'success');
+                    return true;
+                } else {
+                    log(`✗ Error: ${data.error}`, 'error');
+                    showStatus(`Error: ${data.error}`, 'error');
+                    return false;
+                }
+            } catch (error) {
+                log(`✗ Network error: ${error.message}`, 'error');
+                showStatus(`Network error: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        function startSimulation() {
+            const deliveryId = document.getElementById('deliveryId').value;
+            const routeType = document.getElementById('route').value;
+            const intervalSeconds = parseInt(document.getElementById('speed').value);
+            const simulatedSpeed = parseInt(document.getElementById('simulatedSpeed').value);
+
+            if (!deliveryId) {
+                alert('Please enter a delivery ID');
+                return;
+            }
+
+            // Get route coordinates
+            routeCoordinates = routes[routeType] || routes['chennai-local'];
+            currentIndex = 0;
+
+            // Update UI
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('deliveryId').disabled = true;
+            document.getElementById('route').disabled = true;
+            document.getElementById('speed').disabled = true;
+            document.getElementById('simulatedSpeed').disabled = true;
+
+            showStatus(`Simulation started for delivery ${deliveryId}`, 'success');
+            log(`Starting simulation with ${routeCoordinates.length} waypoints`, 'info');
+
+            // Start sending updates
+            simulationInterval = setInterval(async () => {
+                if (currentIndex >= routeCoordinates.length) {
+                    stopSimulation();
+                    showStatus('Simulation completed - reached destination', 'success');
+                    log('Simulation completed', 'success');
+                    return;
+                }
+
+                const point = routeCoordinates[currentIndex];
+                log(`Waypoint ${currentIndex + 1}/${routeCoordinates.length}: ${point.name}`, 'info');
+                
+                const success = await sendLocationUpdate(point.lat, point.lng, simulatedSpeed);
+                
+                if (success) {
+                    currentIndex++;
+                } else {
+                    // Stop on error
+                    stopSimulation();
+                }
+            }, intervalSeconds * 1000);
+        }
+
+        function stopSimulation() {
+            if (simulationInterval) {
+                clearInterval(simulationInterval);
+                simulationInterval = null;
+            }
+
+            // Update UI
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('deliveryId').disabled = false;
+            document.getElementById('route').disabled = false;
+            document.getElementById('speed').disabled = false;
+            document.getElementById('simulatedSpeed').disabled = false;
+
+            showStatus('Simulation stopped', 'info');
+            log('Simulation stopped by user', 'info');
+        }
+
+        // Initialize
+        log('Simulation tool ready', 'success');
+    </script>
+</body>
+</html>

@@ -1,0 +1,388 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum Role {
+  DONOR
+  NGO
+  ADMIN
+  DRIVER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  VERIFIED
+  PENDING
+}
+
+enum ListingStatus {
+  AVAILABLE
+  CLAIMED
+  EXPIRED
+  COMPLETED
+}
+
+enum ClaimStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+}
+
+enum DeliveryStatus {
+  PENDING
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+// ============================================================================
+// USER MODELS
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  clerkId       String?   @unique  // Clerk user ID (legacy)
+  email         String    @unique
+  passwordHash  String?
+  name          String
+  role          Role      @default(DONOR)
+  status        UserStatus @default(ACTIVE)
+  avatar        String?
+  image         String?   // For NextAuth compatibility
+  emailVerified DateTime?
+  provider      String    @default("local")  // "local", "google"
+  isVerified    Boolean   @default(false)  // For NextAuth compatibility
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  donorProfile  Donor?
+  ngoProfile    Ngo?
+  adminProfile  Admin?
+  deliveries    Delivery[]
+  accounts      Account[]
+  sessions      Session[]
+  ngoRequests   NGORequest[]
+
+  @@index([email])
+  @@index([role])
+  @@index([clerkId])
+  @@index([provider])
+  @@index([isVerified])
+}
+
+model Donor {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName  String
+  businessType  String    // Bakery, Restaurant, Grocery, etc.
+  phone         String?
+  address       String
+  latitude      Float
+  longitude     Float
+  rating        Float     @default(0)
+  totalDonated  Int       @default(0)
+  locationSharing Boolean @default(false)
+  preferences   Json      @default("{\"emailUpdates\": true, \"claimAlerts\": true, \"pickupReminders\": true}")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  listings      FoodListing[]
+  ratings       DonorRating[] @relation("DonorRatings")
+
+  @@index([userId])
+}
+
+model Ngo {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationName  String
+  phone             String?
+  address           String
+  latitude          Float
+  longitude         Float
+  storageCapacity   Int       // in kg
+  currentStorage    Int       @default(0)
+  rating            Float     @default(0)
+  totalReceived     Int       @default(0)
+  peopleServed      Int       @default(0)
+  trustScore        Int?      // ML-generated trust score
+  trustLabel        String    @default("New NGO")  // New NGO, Trusted, Highly Trusted
+  locationSharing   Boolean   @default(false)
+  preferences       Json      @default("{\"emailNotifications\": true, \"listingAlerts\": true, \"pickupNotifications\": true}")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  claims            Claim[]
+  deliveries        Delivery[]
+  ratings           DonorRating[] @relation("NGORatings")
+
+  @@index([userId])
+  @@index([trustScore])
+}
+
+model Admin {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions   String[]  @default([])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+// ============================================================================
+// FOOD LISTING MODELS
+// ============================================================================
+
+model FoodListing {
+  id            String    @id @default(cuid())
+  name          String
+  description   String
+  quantity      String
+  category      String    // Bakery, Produce, Prepared Food, Dairy, etc.
+  status        ListingStatus @default(AVAILABLE)
+  priority      String    @default("MEDIUM")  // HIGH, MEDIUM, LOW
+  
+  // Location
+  address       String
+  latitude      Float
+  longitude     Float
+  
+  // Timing
+  expiryTime    DateTime
+  pickupWindow  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Donor info
+  donorId       String
+  donor         Donor     @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  
+  // Relations
+  claims        Claim[]
+
+  @@index([donorId])
+  @@index([status])
+  @@index([category])
+  @@index([expiryTime])
+  @@index([priority])
+}
+
+// ============================================================================
+// CLAIM MODELS
+// ============================================================================
+
+model Claim {
+  id            String    @id @default(cuid())
+  listingId     String
+  listing       FoodListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  
+  ngoId         String
+  ngo           Ngo       @relation(fields: [ngoId], references: [id], onDelete: Cascade)
+  
+  status        ClaimStatus @default(PENDING)
+  claimedAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  delivery      Delivery?
+  rating        DonorRating?
+
+  @@unique([listingId, ngoId])
+  @@index([ngoId])
+  @@index([status])
+}
+
+// ============================================================================
+// DELIVERY MODELS
+// ============================================================================
+
+model Delivery {
+  id            String    @id @default(cuid())
+  claimId       String    @unique
+  claim         Claim     @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  
+  driverId      String
+  driver        User      @relation(fields: [driverId], references: [id])
+  
+  ngoId         String
+  ngo           Ngo       @relation(fields: [ngoId], references: [id])
+  
+  status        DeliveryStatus @default(PENDING)
+  
+  // Current location
+  currentLatitude   Float?
+  currentLongitude  Float?
+  
+  // Timing
+  startedAt     DateTime?
+  completedAt   DateTime?
+  estimatedArrival DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  locationUpdates LocationUpdate[]
+
+  @@index([driverId])
+  @@index([ngoId])
+  @@index([status])
+}
+
+model LocationUpdate {
+  id            String    @id @default(cuid())
+  deliveryId    String
+  delivery      Delivery  @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  
+  latitude      Float
+  longitude     Float
+  accuracy      Float?
+  heading       Float?
+  speed         Float?
+  
+  timestamp     DateTime  @default(now())
+
+  @@index([deliveryId])
+  @@index([timestamp])
+}
+
+
+// ============================================================================
+// NEXTAUTH MODELS
+// ============================================================================
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@index([identifier])
+}
+
+// ============================================================================
+// NGO REQUEST MODEL
+// ============================================================================
+
+model NGORequest {
+  id                 String      @id @default(cuid())
+  userId             String
+  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationName   String
+  address            String
+  proofDocumentUrl   String?     // URL to uploaded proof document
+  status             NGORequestStatus @default(PENDING)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum NGORequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================================================
+// ML MODELS
+// ============================================================================
+
+model DemandForecast {
+  id            String    @id @default(cuid())
+  district      String
+  category      String
+  forecastDate  DateTime  @db.Date
+  predicted     Int
+  lowerCi       Int       // Lower confidence interval
+  upperCi       Int       // Upper confidence interval
+  generatedAt   DateTime  @default(now())
+  
+  @@unique([district, category, forecastDate])
+  @@index([district])
+  @@index([category])
+  @@index([forecastDate])
+}
+
+model DonorRating {
+  id            String    @id @default(cuid())
+  donorId       String
+  donor         Donor     @relation("DonorRatings", fields: [donorId], references: [id], onDelete: Cascade)
+  
+  ngoId         String
+  ngo           Ngo       @relation("NGORatings", fields: [ngoId], references: [id], onDelete: Cascade)
+  
+  claimId       String
+  claim         Claim     @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  
+  rating        Int       // 1-5 stars
+  comment       String?   @db.Text
+  
+  // Rating categories
+  foodQuality   Int?      // 1-5
+  packaging     Int?      // 1-5
+  timeliness    Int?      // 1-5
+  communication Int?      // 1-5
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@unique([claimId])
+  @@index([donorId])
+  @@index([ngoId])
+  @@index([rating])
+  @@index([createdAt])
+}
+

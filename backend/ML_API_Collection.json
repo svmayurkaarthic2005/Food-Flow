@@ -1,0 +1,285 @@
+{
+  "info": {
+    "name": "FoodFlow ML API Collection",
+    "description": "Complete API collection for ML endpoints",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "listing_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "ngo_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "district",
+      "value": "Downtown",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/ml/v1/health",
+          "host": ["{{base_url}}"],
+          "path": ["api", "ml", "v1", "health"]
+        },
+        "description": "Check ML services health status"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "status": "OK",
+          "code": 200,
+          "body": {
+            "status": "healthy",
+            "features": {
+              "recommender": true,
+              "demand": true,
+              "priority": true,
+              "route": true,
+              "heatmap": true
+            },
+            "version": "v1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get NGO Recommendations",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/ml/v1/recommendations/{{listing_id}}?top_n=3",
+          "host": ["{{base_url}}"],
+          "path": ["api", "ml", "v1", "recommendations", "{{listing_id}}"],
+          "query": [
+            {
+              "key": "top_n",
+              "value": "3",
+              "description": "Number of recommendations (1-10)"
+            }
+          ]
+        },
+        "description": "Get top NGO recommendations for a listing"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "status": "OK",
+          "code": 200,
+          "body": [
+            {
+              "ngo_id": 1,
+              "name": "Food Bank Central",
+              "score": 85,
+              "distance_km": 5.2,
+              "trust_score": 78,
+              "trust_label": "High"
+            },
+            {
+              "ngo_id": 2,
+              "name": "Community Kitchen",
+              "score": 72,
+              "distance_km": 8.5,
+              "trust_score": 65,
+              "trust_label": "Medium"
+            },
+            {
+              "ngo_id": 3,
+              "name": "Helping Hands",
+              "score": 68,
+              "distance_km": 12.3,
+              "trust_score": null,
+              "trust_label": "New NGO"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Get Demand Forecast",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/ml/v1/demand?district={{district}}&days=7",
+          "host": ["{{base_url}}"],
+          "path": ["api", "ml", "v1", "demand"],
+          "query": [
+            {
+              "key": "district",
+              "value": "{{district}}",
+              "description": "District name (required)"
+            },
+            {
+              "key": "days",
+              "value": "7",
+              "description": "Number of days to forecast (1-14)"
+            }
+          ]
+        },
+        "description": "Get demand forecast for a district"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "status": "OK",
+          "code": 200,
+          "body": [
+            {
+              "date": "2024-01-15",
+              "category": "Bakery",
+              "predicted": 25,
+              "low": 18,
+              "high": 32
+            },
+            {
+              "date": "2024-01-16",
+              "category": "Bakery",
+              "predicted": 28,
+              "low": 21,
+              "high": 35
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Get Priority Score",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/ml/v1/priority/{{listing_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "ml", "v1", "priority", "{{listing_id}}"]
+        },
+        "description": "Get priority score for a listing (debug)"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "status": "OK",
+          "code": 200,
+          "body": {
+            "listing_id": "123",
+            "priority": "HIGH",
+            "score_inputs": {
+              "hours_until_expiry": 12.5,
+              "category": "Dairy",
+              "storage_temp": 28.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Optimize Route",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"listing_ids\": [1, 2, 3],\n  \"depot\": {\n    \"lat\": 40.7580,\n    \"lng\": -73.9855\n  }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/ml/v1/route",
+          "host": ["{{base_url}}"],
+          "path": ["api", "ml", "v1", "route"]
+        },
+        "description": "Optimize pickup route for multiple listings"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "status": "OK",
+          "code": 200,
+          "body": {
+            "stops": [
+              {
+                "listing_id": 2,
+                "lat": 40.7589,
+                "lng": -73.9851,
+                "eta_minutes": 5.2
+              },
+              {
+                "listing_id": 3,
+                "lat": 40.7614,
+                "lng": -73.9776,
+                "eta_minutes": 18.7
+              },
+              {
+                "listing_id": 1,
+                "lat": 40.7128,
+                "lng": -74.0060,
+                "eta_minutes": 45.3
+              }
+            ],
+            "total_minutes": 65.3,
+            "warning": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Heatmap Data",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/ml/v1/heatmap?district={{district}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "ml", "v1", "heatmap"],
+          "query": [
+            {
+              "key": "district",
+              "value": "{{district}}",
+              "description": "District name (optional)"
+            }
+          ]
+        },
+        "description": "Get demand heatmap data"
+      },
+      "response": [
+        {
+          "name": "Success",
+          "status": "OK",
+          "code": 200,
+          "body": [
+            {
+              "lat": 40.7128,
+              "lng": -74.0060,
+              "intensity": 0.95
+            },
+            {
+              "lat": 40.7589,
+              "lng": -73.9851,
+              "intensity": 0.78
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
