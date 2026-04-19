@@ -73,6 +73,10 @@ export async function POST(request: NextRequest) {
           peopleServed: profileData.peopleServed || 0,
         },
       }
+    } else if (role === 'DRIVER') {
+      // Driver role doesn't need a separate profile table
+      // Drivers are just users with DRIVER role
+      console.log('Creating driver user:', email)
     }
 
     const user = await prisma.user.create({
