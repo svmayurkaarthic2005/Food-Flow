@@ -104,15 +104,16 @@ export default function SignInPage() {
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/30 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="mb-6">
-          <Button
-            type="button"
-            variant="ghost"
-            className="pl-0 inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
-            onClick={() => router.push('/')}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Home
-          </Button>
+          <Link href="/">
+            <Button
+              type="button"
+              variant="ghost"
+              className="pl-0 inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Home
+            </Button>
+          </Link>
         </div>
 
         <Card>
