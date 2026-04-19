@@ -123,6 +123,7 @@ export const authOptions: NextAuthOptions = {
 
   pages: {
     signIn: '/signin',
+    signOut: '/',
     verifyRequest: '/auth/verify-email',
     error: '/signin',
   },

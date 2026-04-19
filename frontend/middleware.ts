@@ -25,28 +25,28 @@ export default withAuth(
     // Protect driver routes
     if (path.startsWith('/driver')) {
       if (token?.role !== 'DRIVER') {
-        return NextResponse.redirect(new URL('/', req.url));
+        return NextResponse.redirect(new URL('/signin', req.url));
       }
     }
 
     // Protect NGO routes
     if (path.startsWith('/ngo')) {
       if (token?.role !== 'NGO' && token?.role !== 'ADMIN') {
-        return NextResponse.redirect(new URL('/', req.url));
+        return NextResponse.redirect(new URL('/signin', req.url));
       }
     }
 
     // Protect donor routes
     if (path.startsWith('/donor')) {
       if (token?.role !== 'DONOR' && token?.role !== 'ADMIN') {
-        return NextResponse.redirect(new URL('/', req.url));
+        return NextResponse.redirect(new URL('/signin', req.url));
       }
     }
 
     // Protect admin routes
     if (path.startsWith('/admin')) {
       if (token?.role !== 'ADMIN') {
-        return NextResponse.redirect(new URL('/', req.url));
+        return NextResponse.redirect(new URL('/signin', req.url));
       }
     }
 
@@ -54,7 +54,14 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      authorized: ({ token, req }) => {
+        // Allow access to home page without authentication
+        if (req.nextUrl.pathname === '/') {
+          return true;
+        }
+        // Require authentication for protected routes
+        return !!token;
+      },
     },
   }
 );

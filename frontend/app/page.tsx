@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useAuth } from '@/contexts/auth-context'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -18,17 +18,20 @@ import {
 } from 'lucide-react'
 
 export default function Home() {
-  const { user, loading } = useAuth()
+  const { data: session, status } = useSession()
+  const loading = status === 'loading'
+  const user = session?.user as any
 
   const getDashboardPath = () => {
     if (!user) return '/signin'
     if (user.role === 'ADMIN') return '/admin'
     if (user.role === 'NGO') return '/ngo'
+    if (user.role === 'DRIVER') return '/driver'
     return '/donor'
   }
 
   const dashboardPath = getDashboardPath()
-  const isAuthenticated = user && !loading
+  const isAuthenticated = !!user && !loading
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
