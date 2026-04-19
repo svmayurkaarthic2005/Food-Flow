@@ -5,9 +5,10 @@ import os
 import logging
 from dotenv import load_dotenv
 
-from app.api.routes import auth, users, listings, claims, analytics, donors, ngos, notifications
-from app.ml.routes import router as ml_router_legacy
-from app.ml.router import router as ml_router_v1
+from app.api.routes import auth, users, listings, claims, analytics, donors, ngos, notifications, email_verification
+# Temporarily disabled ML routers due to Python 3.14 compatibility issues
+# from app.ml.routes import router as ml_router_legacy
+# from app.ml.router import router as ml_router_v1
 from app.db.database import prisma
 from app.jobs import scheduler
 from app.services.email_queue import start_email_worker, stop_email_worker
@@ -91,10 +92,12 @@ app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"]
 app.include_router(donors.router, prefix="/api/donors", tags=["Donors"])
 app.include_router(ngos.router, prefix="/api/ngos", tags=["NGOs"])
 app.include_router(notifications.router, tags=["Notifications"])
+app.include_router(email_verification.router, prefix="/api", tags=["Email Verification"])
 
 # ML routers (v1 with feature flags, legacy for backward compatibility)
-app.include_router(ml_router_v1, tags=["ML v1"])
-app.include_router(ml_router_legacy, prefix="/api", tags=["ML Legacy"])
+# Temporarily disabled due to Python 3.14 compatibility issues
+# app.include_router(ml_router_v1, tags=["ML v1"])
+# app.include_router(ml_router_legacy, prefix="/api", tags=["ML Legacy"])
 
 @app.get("/")
 async def root():

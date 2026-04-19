@@ -1,15 +1,18 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { KPICard } from '@/components/dashboard/kpi-card'
 import { AIInsightCard } from '@/components/dashboard/ai-insight-card'
 import { ListingCard } from '@/components/dashboard/listing-card'
 import { ActivityTimeline } from '@/components/dashboard/activity-timeline'
-import { Plus, Package, Users, TrendingUp, MapPin } from 'lucide-react'
+import { Plus, Package, Users, TrendingUp, MapPin, Truck, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { fetchDashboardAnalytics } from '@/lib/api'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
 import { useMLInsights } from '@/hooks/useMLInsights'
 
 interface DonorDashboardClientProps {
@@ -17,8 +20,11 @@ interface DonorDashboardClientProps {
 }
 
 export default function DonorDashboardClient({ user }: DonorDashboardClientProps) {
+  const router = useRouter()
   const [analytics, setAnalytics] = useState<any>(null)
+  const [recentDeliveries, setRecentDeliveries] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [deliveriesLoading, setDeliveriesLoading] = useState(true)
   
   // Fetch ML insights dynamically
   const { insights: mlInsights, isLoading: mlLoading, isError: mlError } = useMLInsights()
@@ -35,7 +41,23 @@ export default function DonorDashboardClient({ user }: DonorDashboardClientProps
       }
     }
 
+    const loadRecentDeliveries = async () => {
+      try {
+        // Fetch recent deliveries for donor's listings
+        const response = await fetch('/api/donor/deliveries')
+        if (response.ok) {
+          const data = await response.json()
+          setRecentDeliveries(data.deliveries?.slice(0, 5) || [])
+        }
+      } catch (error) {
+        console.error('Failed to load deliveries:', error)
+      } finally {
+        setDeliveriesLoading(false)
+      }
+    }
+
     loadAnalytics()
+    loadRecentDeliveries()
   }, [])
 
   if (loading) {
@@ -201,6 +223,111 @@ export default function DonorDashboardClient({ user }: DonorDashboardClientProps
             type: 'claim',
           })) || []}
         />
+      </div>
+
+      {/* Recent Deliveries */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Recent Deliveries</h2>
+          <Button variant="outline" asChild>
+            <Link href="/donor/history">View All</Link>
+          </Button>
+        </div>
+        {deliveriesLoading ? (
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-24" />
+            ))}
+          </div>
+        ) : recentDeliveries.length > 0 ? (
+          <div className="space-y-3">
+            {recentDeliveries.map((delivery: any) => {
+              const getDeliveryStatusColor = (status: string) => {
+                switch (status) {
+                  case 'PENDING':
+                    return 'bg-gray-100 text-gray-800'
+                  case 'IN_TRANSIT':
+                    return 'bg-blue-100 text-blue-800'
+                  case 'DELIVERED':
+                    return 'bg-green-100 text-green-800'
+                  case 'CANCELLED':
+                    return 'bg-red-100 text-red-800'
+                  default:
+                    return 'bg-gray-100 text-gray-800'
+                }
+              }
+
+              const getDeliveryStatusIcon = (status: string) => {
+                switch (status) {
+                  case 'PENDING':
+                    return '⏳'
+                  case 'IN_TRANSIT':
+                    return '🚚'
+                  case 'DELIVERED':
+                    return '✅'
+                  case 'CANCELLED':
+                    return '❌'
+                  default:
+                    return '📦'
+                }
+              }
+
+              return (
+                <Card key={delivery.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="text-2xl">{getDeliveryStatusIcon(delivery.status)}</div>
+                          <div>
+                            <h4 className="font-semibold">{delivery.claim?.listing?.name || 'Food Donation'}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              To: {delivery.ngo?.organizationName || delivery.ngo?.user?.name || 'NGO'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(delivery.createdAt).toLocaleDateString()}
+                          </span>
+                          {delivery.estimatedArrival && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              ETA: {new Date(delivery.estimatedArrival).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge className={`${getDeliveryStatusColor(delivery.status)} text-xs`}>
+                          {delivery.status.replace('_', ' ')}
+                        </Badge>
+                        {(delivery.status === 'IN_TRANSIT' || delivery.status === 'DELIVERED') && (
+                          <Button
+                            size="sm"
+                            variant={delivery.status === 'DELIVERED' ? 'outline' : 'default'}
+                            className="gap-2"
+                            onClick={() => router.push(`/donor/tracking?id=${delivery.id}`)}
+                          >
+                            <Truck className="w-3 h-3" />
+                            {delivery.status === 'DELIVERED' ? 'View' : 'Track'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <p className="text-muted-foreground">No recent deliveries</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

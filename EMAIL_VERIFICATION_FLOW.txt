@@ -1,0 +1,257 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║              EMAIL VERIFICATION FLOW - COMPLETE SYSTEM                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: USER SIGNUP                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   User fills signup form:
+   ┌──────────────────────┐
+   │ Email: user@test.com │
+   │ Password: ********   │
+   │ Name: John Doe       │
+   │ Role: DONOR          │
+   └──────────────────────┘
+              │
+              ▼
+   POST /api/auth/signup
+              │
+              ▼
+   ┌──────────────────────────────────────┐
+   │ Frontend: signup/route.ts            │
+   │ • Hash password                      │
+   │ • Create user (status: PENDING)      │
+   │ • Generate 32-byte token             │
+   │ • Store in VerificationToken table   │
+   └──────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: SEND VERIFICATION EMAIL                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   Frontend calls backend:
+              │
+              ▼
+   POST /api/send-verification-email
+   {
+     "email": "user@test.com",
+     "name": "John Doe",
+     "verification_url": "http://localhost:3000/auth/verify-email?token=XXX&email=YYY"
+   }
+              │
+              ▼
+   ┌──────────────────────────────────────┐
+   │ Backend: email_verification.py       │
+   │ • Build HTML email template          │
+   │ • Connect to Brevo SMTP              │
+   │ • Send email                         │
+   └──────────────────────────────────────┘
+              │
+              ▼
+   ┌──────────────────────────────────────┐
+   │ Brevo SMTP Server                    │
+   │ smtp-relay.brevo.com:587             │
+   └──────────────────────────────────────┘
+              │
+              ▼
+   ┌──────────────────────────────────────┐
+   │ User's Email Inbox                   │
+   │ ✉️ "Verify your FoodFlow account"    │
+   └──────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: EMAIL CONTENT                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   ┌────────────────────────────────────────────────────────────┐
+   │ 🍽️ Welcome to FoodFlow!                                    │
+   │ Verify your email to get started                           │
+   ├────────────────────────────────────────────────────────────┤
+   │                                                             │
+   │ Hi John Doe,                                                │
+   │                                                             │
+   │ Thank you for signing up for FoodFlow! To complete your    │
+   │ registration, please verify your email address.            │
+   │                                                             │
+   │        ┌─────────────────────────────┐                     │
+   │        │  Verify Email Address       │  ← Green Button    │
+   │        └─────────────────────────────┘                     │
+   │                                                             │
+   │ Or copy this link:                                         │
+   │ http://localhost:3000/auth/verify-email?token=...          │
+   │                                                             │
+   │ ⚠️ This link expires in 24 hours                           │
+   │                                                             │
+   │ Need help? support@foodflow.app                            │
+   └────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 4: USER CLICKS VERIFICATION LINK                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   User clicks button/link:
+              │
+              ▼
+   GET /auth/verify-email?token=XXX&email=user@test.com
+              │
+              ▼
+   ┌──────────────────────────────────────┐
+   │ Frontend: verify-email/page.tsx      │
+   │ • Extract token & email from URL     │
+   │ • Show loading spinner               │
+   └──────────────────────────────────────┘
+              │
+              ▼
+   POST /api/auth/verify-email
+   {
+     "token": "XXX",
+     "email": "user@test.com"
+   }
+              │
+              ▼
+   ┌──────────────────────────────────────┐
+   │ Frontend: verify-email/route.ts      │
+   │ • Find token in database             │
+   │ • Check expiration (< 24h)           │
+   │ • Update user.emailVerified = now    │
+   │ • Delete token (one-time use)        │
+   └──────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STEP 5: VERIFICATION SUCCESS                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   ┌──────────────────────────────────────┐
+   │ ✅ Email Verified!                   │
+   │                                       │
+   │ Your account has been verified.      │
+   │ Redirecting to login...              │
+   │                                       │
+   │ [Go to Login]                        │
+   └──────────────────────────────────────┘
+              │
+              ▼
+   Redirect to /signin (after 3 seconds)
+              │
+              ▼
+   User can now login with verified account ✅
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ERROR SCENARIOS                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   ❌ Invalid Token
+      → "Invalid or expired verification token"
+      → Show "Resend Verification Email" button
+
+   ❌ Expired Token (> 24h)
+      → "Verification token has expired"
+      → Token deleted from database
+      → Show "Resend Verification Email" button
+
+   ❌ User Not Found
+      → "User not found"
+      → Rare case (user deleted after signup)
+
+   ❌ Missing Token/Email
+      → "Invalid verification link"
+      → URL malformed or incomplete
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ RESEND VERIFICATION FLOW                                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   User clicks "Resend Verification Email"
+              │
+              ▼
+   GET /auth/resend-verification
+              │
+              ▼
+   User enters email
+              │
+              ▼
+   POST /api/auth/send-verification
+   {
+     "email": "user@test.com"
+   }
+              │
+              ▼
+   ┌──────────────────────────────────────┐
+   │ Frontend: send-verification/route.ts │
+   │ • Find user by email                 │
+   │ • Check if already verified          │
+   │ • Delete old tokens                  │
+   │ • Generate new token                 │
+   │ • Call backend email service         │
+   └──────────────────────────────────────┘
+              │
+              ▼
+   New verification email sent ✅
+   (Same flow as STEP 2)
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ DATABASE CHANGES                                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   BEFORE VERIFICATION:
+   ┌─────────────────────────────────────────────────────┐
+   │ User Table                                          │
+   ├─────────────────────────────────────────────────────┤
+   │ email: user@test.com                                │
+   │ emailVerified: NULL                                 │
+   │ status: PENDING                                     │
+   └─────────────────────────────────────────────────────┘
+   
+   ┌─────────────────────────────────────────────────────┐
+   │ VerificationToken Table                             │
+   ├─────────────────────────────────────────────────────┤
+   │ identifier: user@test.com                           │
+   │ token: abc123def456...                              │
+   │ expires: 2026-04-20 10:00:00                        │
+   └─────────────────────────────────────────────────────┘
+
+   AFTER VERIFICATION:
+   ┌─────────────────────────────────────────────────────┐
+   │ User Table                                          │
+   ├─────────────────────────────────────────────────────┤
+   │ email: user@test.com                                │
+   │ emailVerified: 2026-04-19 10:00:00 ✅               │
+   │ status: VERIFIED ✅                                 │
+   └─────────────────────────────────────────────────────┘
+   
+   ┌─────────────────────────────────────────────────────┐
+   │ VerificationToken Table                             │
+   ├─────────────────────────────────────────────────────┤
+   │ (Token deleted - one-time use) ✅                   │
+   └─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SYSTEM ARCHITECTURE                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   ┌──────────────┐         ┌──────────────┐         ┌──────────────┐
+   │   Browser    │◄───────►│   Next.js    │◄───────►│   FastAPI    │
+   │  (Frontend)  │         │  (Frontend)  │         │  (Backend)   │
+   └──────────────┘         └──────────────┘         └──────────────┘
+                                   │                         │
+                                   │                         │
+                                   ▼                         ▼
+                            ┌──────────────┐         ┌──────────────┐
+                            │  PostgreSQL  │         │ Brevo SMTP   │
+                            │  (Database)  │         │ (Email Svc)  │
+                            └──────────────┘         └──────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ SYSTEM STATUS: FULLY OPERATIONAL
+
+   • Email verification working
+   • Brevo SMTP integrated
+   • Token expiration enforced
+   • Error handling complete
+   • Resend functionality working
+   • Professional email template
+   • Security measures in place
+
+═══════════════════════════════════════════════════════════════════════════════

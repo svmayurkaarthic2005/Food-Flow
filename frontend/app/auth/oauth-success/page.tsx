@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react'
 function getDashboardPath(role?: string) {
   if (role === 'ADMIN') return '/admin'
   if (role === 'NGO') return '/ngo'
+  if (role === 'DRIVER') return '/driver'
   return '/donor'
 }
 

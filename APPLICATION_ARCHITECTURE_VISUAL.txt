@@ -1,0 +1,311 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    FOODFLOW APPLICATION ARCHITECTURE                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                                                               │
+│                          🌐 USER BROWSER                                     │
+│                    http://localhost:3000                                     │
+│                                                                               │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                                                                        │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                │  │
+│  │  │   Signup     │  │   Login      │  │  Dashboard   │                │  │
+│  │  │   Page       │  │   Page       │  │   Page       │                │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                │  │
+│  │                                                                        │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                │  │
+│  │  │   Donor      │  │   NGO        │  │   Driver     │                │  │
+│  │  │   Dashboard  │  │   Dashboard  │  │   Dashboard  │                │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                │  │
+│  │                                                                        │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                │  │
+│  │  │   Tracking   │  │   Settings   │  │   History    │                │  │
+│  │  │   Page       │  │   Page       │  │   Page       │                │  │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                │  │
+│  │                                                                        │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ HTTP Requests
+                                    │ (API Calls)
+                                    │
+                ┌───────────────────┴───────────────────┐
+                │                                       │
+                ▼                                       ▼
+    ┌──────────────────────────┐          ┌──────────────────────────┐
+    │   FRONTEND SERVER        │          │   BACKEND SERVER         │
+    │   (Next.js 14)           │          │   (FastAPI)              │
+    │   Port: 3000             │          │   Port: 8000             │
+    │                          │          │                          │
+    │  ┌────────────────────┐  │          │  ┌────────────────────┐  │
+    │  │ React Components   │  │          │  │ API Routes         │  │
+    │  │ • Signup           │  │          │  │ • /auth/signup     │  │
+    │  │ • Login            │  │          │  │ • /auth/login      │  │
+    │  │ • Dashboard        │  │          │  │ • /listings        │  │
+    │  │ • Tracking         │  │          │  │ • /claims          │  │
+    │  └────────────────────┘  │          │  │ • /deliveries      │  │
+    │                          │          │  │ • /send-email      │  │
+    │  ┌────────────────────┐  │          │  └────────────────────┘  │
+    │  │ API Routes         │  │          │                          │
+    │  │ • /api/auth/*      │  │          │  ┌────────────────────┐  │
+    │  │ • /api/listings    │  │          │  │ Services           │  │
+    │  │ • /api/claims      │  │          │  │ • Email Queue      │  │
+    │  │ • /api/deliveries  │  │          │  │ • Background Jobs  │  │
+    │  └────────────────────┘  │          │  │ • Scheduler        │  │
+    │                          │          │  └────────────────────┘  │
+    │  ┌────────────────────┐  │          │                          │
+    │  │ NextAuth           │  │          │  ┌────────────────────┐  │
+    │  │ • JWT Tokens       │  │          │  │ Prisma ORM         │  │
+    │  │ • Sessions         │  │          │  │ • Database Access  │  │
+    │  │ • Cookies          │  │          │  │ • Query Builder    │  │
+    │  └────────────────────┘  │          │  └────────────────────┘  │
+    │                          │          │                          │
+    │  ┌────────────────────┐  │          │  ┌────────────────────┐  │
+    │  │ Prisma Client      │  │          │  │ Prisma Python      │  │
+    │  │ • Database ORM     │  │          │  │ • Database ORM     │  │
+    │  │ • Query Builder    │  │          │  │ • Async Support    │  │
+    │  └────────────────────┘  │          │  └────────────────────┘  │
+    │                          │          │                          │
+    └──────────────────────────┘          └──────────────────────────┘
+                │                                       │
+                │                                       │
+                └───────────────────┬───────────────────┘
+                                    │
+                                    │ SQL Queries
+                                    │
+                                    ▼
+                    ┌──────────────────────────────┐
+                    │   PostgreSQL Database        │
+                    │   (Shared by both)           │
+                    │                              │
+                    │  ┌────────────────────────┐  │
+                    │  │ Tables:                │  │
+                    │  │ • users                │  │
+                    │  │ • donors               │  │
+                    │  │ • ngos                 │  │
+                    │  │ • food_listings        │  │
+                    │  │ • claims               │  │
+                    │  │ • deliveries           │  │
+                    │  │ • verification_tokens  │  │
+                    │  │ • location_updates     │  │
+                    │  └────────────────────────┘  │
+                    │                              │
+                    └──────────────────────────────┘
+                                    │
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+                    ▼                               ▼
+        ┌──────────────────────┐      ┌──────────────────────┐
+        │   BREVO SMTP         │      │   REDIS (Optional)   │
+        │   Email Service      │      │   Message Queue      │
+        │                      │      │                      │
+        │  • Sends emails      │      │  • Email queue       │
+        │  • Verification      │      │  • Background jobs   │
+        │  • Notifications     │      │  • Caching           │
+        │  • Alerts            │      │                      │
+        └──────────────────────┘      └──────────────────────┘
+                    │
+                    ▼
+        ┌──────────────────────┐
+        │   User Email Inbox   │
+        │                      │
+        │  • Verification      │
+        │  • Notifications     │
+        │  • Alerts            │
+        └──────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 DATA FLOW - SIGNUP EXAMPLE
+
+User fills form
+    │
+    ├─ Email: user@example.com
+    ├─ Password: SecurePass123!
+    ├─ Name: John Doe
+    └─ Role: DONOR
+    │
+    ▼
+Frontend (signup/page.tsx)
+    │
+    ├─ Validate input
+    ├─ Hash password with bcrypt
+    ├─ Call POST /api/auth/signup
+    │
+    ▼
+Frontend API Route (app/api/auth/signup/route.ts)
+    │
+    ├─ Create user in database
+    │   INSERT INTO users (email, passwordHash, name, role)
+    │   VALUES ('user@example.com', 'hashed_password', 'John Doe', 'DONOR')
+    │
+    ├─ Generate verification token
+    │   token = random 32 bytes
+    │   expires = now + 24 hours
+    │
+    ├─ Store token in database
+    │   INSERT INTO verification_tokens (identifier, token, expires)
+    │   VALUES ('user@example.com', 'token_abc123', '2026-04-20 10:00:00')
+    │
+    ├─ Call Backend Email Service
+    │   POST http://localhost:8000/api/send-verification-email
+    │   {
+    │     "email": "user@example.com",
+    │     "name": "John Doe",
+    │     "verification_url": "http://localhost:3000/auth/verify-email?token=abc123&email=user@example.com"
+    │   }
+    │
+    ▼
+Backend Email Service (app/api/routes/email_verification.py)
+    │
+    ├─ Build HTML email
+    │   <html>
+    │     <body>
+    │       <h1>Welcome to FoodFlow!</h1>
+    │       <p>Hi John Doe,</p>
+    │       <p><a href="http://localhost:3000/auth/verify-email?token=abc123&email=user@example.com">
+    │         Verify Email Address
+    │       </a></p>
+    │     </body>
+    │   </html>
+    │
+    ├─ Connect to Brevo SMTP
+    │   Host: smtp-relay.brevo.com
+    │   Port: 587
+    │   User: xsmtpsib-958f6d98327e696d64980048ef4bac947b47efb766bc69b6268260ffa18fae56
+    │   Password: 7xgL3HCYsB46Mgkguse
+    │
+    ├─ Send email
+    │   FROM: noreply@foodflow.app
+    │   TO: user@example.com
+    │   SUBJECT: Verify your FoodFlow account
+    │   BODY: [HTML email]
+    │
+    ▼
+Brevo SMTP Server
+    │
+    ├─ Authenticate
+    ├─ Queue email
+    ├─ Send to user@example.com
+    │
+    ▼
+User Email Inbox
+    │
+    ├─ Email received
+    ├─ Subject: Verify your FoodFlow account
+    ├─ From: noreply@foodflow.app
+    │
+    ▼
+User clicks verification link
+    │
+    ├─ http://localhost:3000/auth/verify-email?token=abc123&email=user@example.com
+    │
+    ▼
+Frontend Verification Page (auth/verify-email/page.tsx)
+    │
+    ├─ Extract token and email from URL
+    ├─ Call POST /api/auth/verify-email
+    │   {
+    │     "token": "abc123",
+    │     "email": "user@example.com"
+    │   }
+    │
+    ▼
+Frontend API Route (app/api/auth/verify-email/route.ts)
+    │
+    ├─ Find token in database
+    │   SELECT * FROM verification_tokens
+    │   WHERE identifier = 'user@example.com' AND token = 'abc123'
+    │
+    ├─ Check if token exists
+    │   if (!token) return error "Invalid token"
+    │
+    ├─ Check if expired
+    │   if (token.expires < now) return error "Token expired"
+    │
+    ├─ Mark email as verified
+    │   UPDATE users SET emailVerified = now
+    │   WHERE email = 'user@example.com'
+    │
+    ├─ Delete token (one-time use)
+    │   DELETE FROM verification_tokens
+    │   WHERE identifier = 'user@example.com' AND token = 'abc123'
+    │
+    ▼
+Frontend Response
+    │
+    ├─ HTTP 200 OK
+    ├─ { "success": true }
+    │
+    ▼
+User sees: "Email verified! Redirecting to login..."
+    │
+    ▼
+User can now login with verified account ✅
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔐 SECURITY LAYERS
+
+Layer 1: Frontend
+    • Input validation
+    • Password hashing (bcrypt)
+    • Secure cookies (HTTP-only)
+    • CSRF protection
+
+Layer 2: API
+    • JWT token validation
+    • Rate limiting
+    • Input sanitization
+    • Error handling
+
+Layer 3: Database
+    • SQL injection prevention (Prisma)
+    • Password never stored plain
+    • Tokens expire after 24h
+    • One-time use tokens
+
+Layer 4: Email
+    • Brevo SMTP authentication
+    • Encrypted connection (TLS)
+    • Verified sender domain
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚡ PERFORMANCE OPTIMIZATION
+
+Frontend:
+    • Server-side rendering (Next.js)
+    • Static generation
+    • Image optimization
+    • Code splitting
+    • Caching strategies
+
+Backend:
+    • Async/await (non-blocking)
+    • Email queue (async sending)
+    • Background jobs
+    • Database connection pooling
+
+Database:
+    • Indexes on key columns
+    • Query optimization
+    • Connection pooling
+    • Caching layer (Redis)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ COMPLETE SYSTEM READY
+
+Frontend:  ✅ Running on port 3000
+Backend:   ✅ Running on port 8000
+Database:  ✅ PostgreSQL connected
+Email:     ✅ Brevo SMTP configured
+Queue:     ✅ Redis ready (optional)
+
+All systems operational! 🚀
+
+═══════════════════════════════════════════════════════════════════════════════

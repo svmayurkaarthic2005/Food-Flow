@@ -1,14 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { fetchListings } from '@/lib/api'
-import { MapPin, Calendar, Package, TrendingUp } from 'lucide-react'
+import { MapPin, Calendar, Package, TrendingUp, Truck } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 
 export default function DonorHistoryPage() {
+  const router = useRouter()
   const [listings, setListings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -186,6 +189,21 @@ export default function DonorHistoryPage() {
                       <p className="text-sm text-muted-foreground line-clamp-2">
                         {listing.description}
                       </p>
+
+                      {/* Track Delivery Button */}
+                      {listing.claims && listing.claims.length > 0 && listing.claims[0].delivery && (
+                        <div className="mt-3">
+                          <Button
+                            size="sm"
+                            variant={listing.claims[0].delivery.status === 'DELIVERED' ? 'outline' : 'default'}
+                            className="gap-2"
+                            onClick={() => router.push(`/donor/tracking?id=${listing.claims[0].delivery.id}`)}
+                          >
+                            <Truck className="w-4 h-4" />
+                            {listing.claims[0].delivery.status === 'DELIVERED' ? 'View Delivery' : 'Track Delivery'}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>

@@ -154,17 +154,7 @@ export const authOptions: NextAuthOptions = {
         if (account?.provider === 'google' && user.email) {
           console.log('AUTH DEBUG: Google OAuth sign in detected')
           
-          // Update user avatar with Google profile picture
-          if (user.image) {
-            await prisma.user.update({
-              where: { email: user.email },
-              data: { avatar: user.image },
-            })
-            console.log('AUTH DEBUG: Updated user avatar from Google:', user.image)
-          }
-          
-          // For Google OAuth, the adapter handles user creation
-          // We just need to ensure profile creation if needed
+          // Check if user exists in database
           const dbUser = await prisma.user.findUnique({
             where: { email: user.email },
             select: {
@@ -172,6 +162,7 @@ export const authOptions: NextAuthOptions = {
               role: true,
               status: true,
               name: true,
+              avatar: true,
               donorProfile: true,
               ngoProfile: true,
               adminProfile: true,
@@ -181,46 +172,65 @@ export const authOptions: NextAuthOptions = {
           console.log('AUTH DEBUG: Google user found', { 
             id: dbUser?.id, 
             role: dbUser?.role,
+            exists: !!dbUser,
             hasDonorProfile: !!dbUser?.donorProfile,
             hasNgoProfile: !!dbUser?.ngoProfile 
           })
 
-          // Only create profile if missing
-          if (dbUser && dbUser.role === 'DONOR' && !dbUser.donorProfile) {
-            console.log('AUTH DEBUG: Creating donor profile for Google user')
-            await prisma.donor.create({
-              data: {
-                userId: dbUser.id,
-                businessName: dbUser.name || 'Donor Account',
-                businessType: 'Other',
-                address: '',
-                latitude: 0,
-                longitude: 0,
-              },
-            })
-          }
+          // If user exists, update avatar and create missing profiles
+          if (dbUser) {
+            // Update user avatar with Google profile picture if different
+            if (user.image && user.image !== dbUser.avatar) {
+              await prisma.user.update({
+                where: { email: user.email },
+                data: { avatar: user.image },
+              })
+              console.log('AUTH DEBUG: Updated user avatar from Google:', user.image)
+            }
 
-          if (dbUser && dbUser.role === 'NGO' && !dbUser.ngoProfile) {
-            console.log('AUTH DEBUG: Creating NGO profile for Google user')
-            await prisma.ngo.create({
-              data: {
-                userId: dbUser.id,
-                organizationName: dbUser.name || 'NGO Account',
-                address: '',
-                latitude: 0,
-                longitude: 0,
-                storageCapacity: 0,
-              },
-            })
-          }
+            // Only create profile if missing
+            if (dbUser.role === 'DONOR' && !dbUser.donorProfile) {
+              console.log('AUTH DEBUG: Creating donor profile for Google user')
+              await prisma.donor.create({
+                data: {
+                  userId: dbUser.id,
+                  businessName: dbUser.name || 'Donor Account',
+                  businessType: 'Other',
+                  address: '',
+                  latitude: 0,
+                  longitude: 0,
+                },
+              })
+            }
 
-          if (dbUser && dbUser.role === 'ADMIN' && !dbUser.adminProfile) {
-            console.log('AUTH DEBUG: Creating admin profile for Google user')
-            await prisma.admin.create({
-              data: {
-                userId: dbUser.id,
-              },
-            })
+            if (dbUser.role === 'NGO' && !dbUser.ngoProfile) {
+              console.log('AUTH DEBUG: Creating NGO profile for Google user')
+              await prisma.ngo.create({
+                data: {
+                  userId: dbUser.id,
+                  organizationName: dbUser.name || 'NGO Account',
+                  address: '',
+                  latitude: 0,
+                  longitude: 0,
+                  storageCapacity: 0,
+                },
+              })
+            }
+
+            if (dbUser.role === 'ADMIN' && !dbUser.adminProfile) {
+              console.log('AUTH DEBUG: Creating admin profile for Google user')
+              await prisma.admin.create({
+                data: {
+                  userId: dbUser.id,
+                },
+              })
+            }
+
+            // DRIVER role doesn't need a profile table
+          } else {
+            // New user - let the adapter create the user first
+            // Profile creation will happen in complete-profile API
+            console.log('AUTH DEBUG: New Google user - will be created by adapter')
           }
         }
 
@@ -228,7 +238,8 @@ export const authOptions: NextAuthOptions = {
       } catch (error) {
         console.error('SIGNIN ERROR FULL:', JSON.stringify(error, null, 2))
         console.error('SIGNIN ERROR:', error)
-        return false
+        // Don't block signin on profile creation errors
+        return true
       }
     },
 

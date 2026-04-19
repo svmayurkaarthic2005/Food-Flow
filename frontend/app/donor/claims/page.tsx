@@ -1,15 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { fetchClaims } from '@/lib/api'
-import { MapPin, Calendar, Users, Package } from 'lucide-react'
+import { MapPin, Calendar, Users, Package, Truck } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 
 export default function DonorClaimsPage() {
+  const router = useRouter()
   const [claims, setClaims] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
@@ -178,9 +180,15 @@ export default function DonorClaimsPage() {
                           </Button>
                         </div>
                       )}
-                      {claim.status === 'ACCEPTED' && (
-                        <Button size="sm" variant="outline" className="w-full">
-                          View Delivery
+                      {(claim.status === 'ACCEPTED' || claim.status === 'COMPLETED') && claim.delivery && (
+                        <Button 
+                          size="sm" 
+                          variant={claim.delivery.status === 'DELIVERED' ? 'outline' : 'default'}
+                          className="w-full gap-2"
+                          onClick={() => router.push(`/donor/tracking?id=${claim.delivery.id}`)}
+                        >
+                          <Truck className="w-4 h-4" />
+                          {claim.delivery.status === 'DELIVERED' ? 'View Delivery' : 'Track Delivery'}
                         </Button>
                       )}
                     </div>

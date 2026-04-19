@@ -2,16 +2,38 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 
-// Simple email sending function (you would integrate with a real email service)
-async function sendVerificationEmail(email: string, token: string) {
+// Send verification email via backend email service
+async function sendVerificationEmail(email: string, token: string, userName: string) {
   const verificationUrl = `${process.env.NEXTAUTH_URL}/auth/verify-email?token=${token}&email=${encodeURIComponent(email)}`
 
-  // TODO: Integrate with email service (SendGrid, Resend, etc.)
-  console.log(`Verification email would be sent to ${email}`)
-  console.log(`Verification URL: ${verificationUrl}`)
+  try {
+    // Call backend email service
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const response = await fetch(`${backendUrl}/api/send-verification-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        name: userName,
+        verification_url: verificationUrl,
+      }),
+    })
 
-  // For now, just log it
-  return true
+    if (!response.ok) {
+      console.error('Failed to send verification email via backend')
+      // Fallback: log to console for development
+      console.log(`Verification URL for ${email}: ${verificationUrl}`)
+      return false
+    }
+
+    console.log(`✅ Verification email sent to ${email}`)
+    return true
+  } catch (error) {
+    console.error('Error sending verification email:', error)
+    // Fallback: log to console for development
+    console.log(`Verification URL for ${email}: ${verificationUrl}`)
+    return false
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -65,7 +87,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Send verification email
-    await sendVerificationEmail(email, token)
+    await sendVerificationEmail(email, token, user.name)
 
     return NextResponse.json(
       { success: true, message: 'Verification email sent' },

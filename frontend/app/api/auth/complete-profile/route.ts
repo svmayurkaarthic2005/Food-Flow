@@ -4,15 +4,15 @@ import { authOptions } from '@/lib/auth-nextauth'
 import { getSessionFromRequest } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-type RoleInput = 'DONOR' | 'NGO'
+type RoleInput = 'DONOR' | 'NGO' | 'DRIVER'
 
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
     const role = body?.role as RoleInput | undefined
 
-    if (!role || (role !== 'DONOR' && role !== 'NGO')) {
-      return NextResponse.json({ error: 'Role must be DONOR or NGO' }, { status: 400 })
+    if (!role || (role !== 'DONOR' && role !== 'NGO' && role !== 'DRIVER')) {
+      return NextResponse.json({ error: 'Role must be DONOR, NGO, or DRIVER' }, { status: 400 })
     }
 
     const jwtSession = await getSessionFromRequest(request)
@@ -124,6 +124,9 @@ export async function PATCH(request: NextRequest) {
         },
       })
     }
+
+    // DRIVER role doesn't need a separate profile table
+    // Drivers are just users with DRIVER role
 
     return NextResponse.json({ success: true })
   } catch (error) {
